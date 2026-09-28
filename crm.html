@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -118,6 +117,7 @@ function dataURItoBlob(dataURI){
 async function uploadFotoParaFacebook(fotoDataURI, token, pageId, published=false){
   try{
     let resp;
+    let photoId = null;
     if(fotoDataURI.startsWith('data:')){
       const blob = dataURItoBlob(fotoDataURI);
       const form = new FormData();
@@ -133,25 +133,58 @@ async function uploadFotoParaFacebook(fotoDataURI, token, pageId, published=fals
       resp = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {method:'POST', body:body});
     }
     const data = await resp.json();
-    console.log('FB photo upload response:', data);
-    if(data.error){ console.error('FB photo error:', data.error); alert('❌ Erro upload foto FB: '+data.error.message); return null; }
-    if(data.id){
-      // Pega URL pública da foto
-      try{
-        const urlInfo = `https://graph.facebook.com/v19.0/${data.id}?fields=images,link&access_token=${token}`;
-        const respInfo = await fetch(urlInfo);
-        const info = await respInfo.json();
-        const publicUrl = info.images && info.images[0] ? info.images[0].source : null;
-        return {id: data.id, url: publicUrl, post_id: data.post_id};
-      }catch(e){
-        return {id: data.id, url: null, post_id: data.post_id};
-      }
-    } else {
-      console.error('Erro upload FB:', data);
+    console.log('FB upload response:', data);
+    if(data.error){
+      console.error('FB upload error:', data.error);
       return null;
     }
-  }catch(e){ console.error('Erro upload:', e); return null; }
+    if(data.id){
+      photoId = data.id;
+      // Pega URL pública da foto com retry
+      let publicUrl = null;
+      for(let attempt=0; attempt<3; attempt++){
+        try{
+          if(attempt>0) await new Promise(r=>setTimeout(r, 1500));
+          const urlInfo = `https://graph.facebook.com/v19.0/${data.id}?fields=images,link,picture&access_token=${token}`;
+          console.log(`FB: Tentando pegar URL pública, tentativa ${attempt+1}:`, urlInfo.substring(0,100));
+          const respInfo = await fetch(urlInfo);
+          const info = await respInfo.json();
+          console.log(`FB: Info tentativa ${attempt+1}:`, info);
+          if(info.images && info.images[0] && info.images[0].source){
+            publicUrl = info.images[0].source;
+            console.log(`FB: URL pública obtida na tentativa ${attempt+1}:`, publicUrl.substring(0,100));
+            break;
+          } else if(info.link){
+            // Fallback: usa link se images não disponível
+            publicUrl = info.link;
+            console.log(`FB: Usando link como fallback:`, publicUrl);
+            break;
+          } else if(info.picture){
+            publicUrl = info.picture;
+            console.log(`FB: Usando picture como fallback:`, publicUrl);
+            break;
+          }
+        }catch(e){
+          console.warn(`FB: Erro tentativa ${attempt+1} ao pegar URL:`, e);
+        }
+      }
+      // Se ainda não tem URL, tenta construir URL direta do CDN via picture
+      if(!publicUrl){
+        try{
+          // Tenta endpoint picture
+          const picUrl = `https://graph.facebook.com/v19.0/${data.id}/picture?access_token=${token}&width=800`;
+          console.log(`FB: Tentando picture endpoint:`, picUrl);
+          publicUrl = picUrl; // Usa mesmo que seja redirect
+        }catch(e){}
+      }
+      return {id: data.id, url: publicUrl, post_id: data.post_id, link: data.link};
+    } else {
+      console.error('Erro upload FB: sem ID', data);
+      return null;
+    }
+  }catch(e){ console.error('Erro upload FB:', e); return null; }
 }
+
 
 async function publicarNoFacebookAutomatico(imovel, btn=null){
   const token = FB_AUTO_CONFIG.getToken();
@@ -239,23 +272,45 @@ async function publicarNoInstagramAutomatico(imovel, btn=null){
   for(let i=0;i<fotos.length;i++){
     if(btn) btn.textContent=`📸 Insta ${i+1}/${fotos.length}...`;
     const foto = fotos[i];
+    console.log(`IG: Processando foto ${i+1}/${fotos.length}, tipo: ${foto.substring(0,20)}...`);
     if(foto.startsWith('data:')){
       // Upload para Facebook como não publicado para obter URL pública
-      const up = await uploadFotoParaFacebook(foto, token, pageId, false);
-      if(up && up.url){
-        fotosPublicas.push(up.url);
-        console.log(`Foto ${i+1} convertida para URL pública:`, up.url);
-      } else {
-        console.warn(`Foto ${i+1} não conseguiu URL pública, tentando direto...`);
-        // Fallback: tenta usar data URI convertida para blob URL temporário via servidor local? Não funciona para IG, então pula
+      try{
+        const up = await uploadFotoParaFacebook(foto, token, pageId, false);
+        console.log(`IG: Upload FB foto ${i+1} resultado:`, up);
+        if(up && up.url){
+          // Aguarda 1s para Facebook processar
+          await new Promise(r=>setTimeout(r, 1000));
+          fotosPublicas.push(up.url);
+          console.log(`Foto ${i+1} convertida para URL pública:`, up.url);
+        } else {
+          console.warn(`Foto ${i+1} não conseguiu URL pública:`, up);
+          // Tenta novamente pegando URL via API
+          if(up && up.id){
+            try{
+              const urlInfo = `https://graph.facebook.com/v19.0/${up.id}?fields=images&access_token=${token}`;
+              const respInfo = await fetch(urlInfo);
+              const info = await respInfo.json();
+              console.log(`IG: Info foto ${i+1}:`, info);
+              if(info.images && info.images[0]){
+                fotosPublicas.push(info.images[0].source);
+                console.log(`Foto ${i+1} URL recuperada via API:`, info.images[0].source);
+              }
+            }catch(e){ console.error(`Erro ao recuperar URL foto ${i+1}:`, e); }
+          }
+        }
+      }catch(e){
+        console.error(`Erro upload FB foto ${i+1} para IG:`, e);
       }
     } else {
       fotosPublicas.push(foto);
     }
   }
   
+  console.log(`IG: Total fotos públicas: ${fotosPublicas.length}/${fotos.length}`, fotosPublicas);
+  
   if(fotosPublicas.length===0){
-    alert('❌ Instagram: nenhuma foto com URL pública disponível.\n\nFotos do computador foram enviadas para o Facebook para gerar link público, mas o Facebook ainda está processando.\n\nTente novamente em 30 segundos ou publique manualmente no Instagram.');
+    alert('❌ Instagram: nenhuma foto com URL pública disponível.\n\nFotos do computador foram enviadas para o Facebook para gerar link público, mas o Facebook ainda está processando.\n\nTente novamente em 30 segundos ou publique manualmente no Instagram.\n\nDica: Abra F12 > Console para ver detalhes do erro.');
     if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; }
     return false;
   }
@@ -272,33 +327,72 @@ ${imovel.descricao ? imovel.descricao.substring(0,200) : ''}
 
   try{
     if(fotosPublicas.length===1){
+      console.log('IG: Criando media 1 foto...', fotosPublicas[0].substring(0,100));
       const body1 = new URLSearchParams();
       body1.append('image_url', fotosPublicas[0]);
       body1.append('caption', legenda);
       body1.append('access_token', token);
       const resp1 = await fetch(`https://graph.facebook.com/v19.0/${igId}/media`, {method:'POST', body:body1});
       const data1 = await resp1.json();
-      if(!data1.id){ console.error('IG 1 foto erro:', data1); if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } alert('Erro Instagram: '+(data1.error?.message||JSON.stringify(data1))); return false; }
+      console.log('IG: Media creation response:', data1);
+      if(!data1.id){ 
+        console.error('IG 1 foto erro:', data1); 
+        if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } 
+        const errMsg = data1.error ? `${data1.error.message} (código ${data1.error.code})` : JSON.stringify(data1);
+        alert('❌ Erro Instagram (1 foto):\n'+errMsg+'\n\nPossíveis causas:\n- Foto muito pequena (<320px)\n- Formato inválido\n- URL expirou\n\nTente com outra foto ou publique manualmente.\n\nDetalhes no Console (F12)'); 
+        return false; 
+      }
+      console.log('IG: Aguardando 3s para processar...');
+      await new Promise(r=>setTimeout(r, 3000));
       const body2 = new URLSearchParams();
       body2.append('creation_id', data1.id);
       body2.append('access_token', token);
       const resp2 = await fetch(`https://graph.facebook.com/v19.0/${igId}/media_publish`, {method:'POST', body:body2});
       const data2 = await resp2.json();
+      console.log('IG: Publish response:', data2);
+      if(!data2.id && data2.error){
+        alert('❌ Erro ao publicar Instagram:\n'+data2.error.message);
+      }
       if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; }
       return !!data2.id;
     } else {
       const containerIds = [];
       for(let i=0;i<fotosPublicas.length;i++){
         if(btn) btn.textContent=`📸 Insta ${i+1}/${fotosPublicas.length}...`;
+        console.log(`IG: Criando container ${i+1}/${fotosPublicas.length}...`);
         const body = new URLSearchParams();
         body.append('image_url', fotosPublicas[i]);
         body.append('is_carousel_item','true');
         body.append('access_token', token);
         const resp = await fetch(`https://graph.facebook.com/v19.0/${igId}/media`, {method:'POST', body:body});
         const data = await resp.json();
-        if(data.id) containerIds.push(data.id);
+        console.log(`IG: Container ${i+1} response:`, data);
+        if(data.id) {
+          containerIds.push(data.id);
+        } else {
+          console.warn(`IG: Container ${i+1} falhou:`, data);
+        }
+        await new Promise(r=>setTimeout(r, 1000));
       }
-      if(containerIds.length===0){ if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } return false; }
+      console.log(`IG: Containers criados: ${containerIds.length}/${fotosPublicas.length}`, containerIds);
+      if(containerIds.length===0){ 
+        if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } 
+        alert('❌ Instagram: nenhum container criado. Veja Console (F12) para detalhes.');
+        return false; 
+      }
+      if(containerIds.length===1){
+        // Se só 1 container funcionou, publica como foto única
+        console.log('IG: Só 1 container, publicando como foto única...');
+        const bodyPub = new URLSearchParams();
+        bodyPub.append('creation_id', containerIds[0]);
+        bodyPub.append('access_token', token);
+        const respPub = await fetch(`https://graph.facebook.com/v19.0/${igId}/media_publish`, {method:'POST', body:bodyPub});
+        const dataPub = await respPub.json();
+        console.log('IG: Publish 1 foto (fallback) response:', dataPub);
+        if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; }
+        return !!dataPub.id;
+      }
+      console.log('IG: Criando carrossel com', containerIds.length, 'imagens...');
       const bodyCar = new URLSearchParams();
       bodyCar.append('caption', legenda);
       bodyCar.append('media_type','CAROUSEL');
@@ -306,17 +400,42 @@ ${imovel.descricao ? imovel.descricao.substring(0,200) : ''}
       bodyCar.append('access_token', token);
       const respCar = await fetch(`https://graph.facebook.com/v19.0/${igId}/media`, {method:'POST', body:bodyCar});
       const dataCar = await respCar.json();
-      if(!dataCar.id){ if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } return false; }
+      console.log('IG: Carrossel creation response:', dataCar);
+      if(!dataCar.id){ 
+        console.error('IG: Carrossel creation falhou:', dataCar);
+        if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } 
+        alert('❌ Erro ao criar carrossel Instagram:\n'+(dataCar.error?.message||JSON.stringify(dataCar))+'\n\nTentando publicar como fotos individuais...');
+        // Fallback: publica primeira foto
+        const bodyPub = new URLSearchParams();
+        bodyPub.append('creation_id', containerIds[0]);
+        bodyPub.append('access_token', token);
+        const respPub = await fetch(`https://graph.facebook.com/v19.0/${igId}/media_publish`, {method:'POST', body:bodyPub});
+        const dataPub = await respPub.json();
+        if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; }
+        return !!dataPub.id;
+      }
+      await new Promise(r=>setTimeout(r, 2000));
       const bodyPub = new URLSearchParams();
       bodyPub.append('creation_id', dataCar.id);
       bodyPub.append('access_token', token);
       const respPub = await fetch(`https://graph.facebook.com/v19.0/${igId}/media_publish`, {method:'POST', body:bodyPub});
       const dataPub = await respPub.json();
+      console.log('IG: Carrossel publish response:', dataPub);
+      if(dataPub.error){
+        console.error('IG: Carrossel publish erro:', dataPub.error);
+        alert('❌ Erro ao publicar carrossel:\n'+dataPub.error.message);
+      }
       if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; }
       return !!dataPub.id;
     }
-  }catch(e){ console.error(e); if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } return false; }
+  }catch(e){ 
+    console.error('IG: Erro geral:', e); 
+    if(btn){ btn.textContent='📢 Publicar'; btn.disabled=false; } 
+    alert('❌ Erro Instagram: '+e.message+'\n\nVeja Console (F12) para detalhes');
+    return false; 
+  }
 }
+
 
 
 async function publicarImovelAtual(){
@@ -920,5 +1039,6 @@ window.addEventListener('hashchange', render);
 
 render();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a41ee3f9e9335b29',t:'MTc5MDU1ODA1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a425060029341aad',t:'MTc5MDYyMjM2Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
+
