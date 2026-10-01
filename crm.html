@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -100,6 +101,25 @@ const FB_AUTO_CONFIG = {
         getToken: function(){ try{ localStorage.removeItem('fb_page_token'); localStorage.setItem('fb_page_token', this.pageToken); return this.pageToken; }catch(e){ return this.pageToken; } }
     };
 try{ localStorage.setItem('fb_page_token', FB_AUTO_CONFIG.pageToken); localStorage.setItem('fb_page_id', FB_AUTO_CONFIG.pageId); localStorage.setItem('fb_ig_id', FB_AUTO_CONFIG.instagramId); console.log('✅ Token atualizado:', FB_AUTO_CONFIG.pageToken.substring(0,20)); }catch(e){ console.error(e); }
+
+function vincularFaceInsta(){
+  const cbFace = document.getElementById('fPubFace');
+  const cbInsta = document.getElementById('fPubInsta');
+  if(!cbFace || !cbInsta) return;
+  // Quando marca Face, marca Insta também (vinculado definitivamente)
+  cbFace.addEventListener('change', function(){
+    if(this.checked){
+      cbInsta.checked = true;
+      console.log('Facebook marcado, Instagram vinculado automaticamente');
+    }
+  });
+  cbInsta.addEventListener('change', function(){
+    if(this.checked){
+      cbFace.checked = true;
+      console.log('Instagram marcado, Facebook vinculado automaticamente');
+    }
+  });
+}
 
 
 
@@ -1039,6 +1059,5 @@ window.addEventListener('hashchange', render);
 
 render();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a425060029341aad',t:'MTc5MDYyMjM2Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
-

@@ -97,6 +97,8 @@ function saveLeadToCRM(lead){
 }
 
 let filters={busca:"", finalidade:"", tipo:"", bairro:"", dorm:"", valor:""};
+let currentPage = 1;
+const itemsPerPage = 12;
 let carouselIndex=0;
 const textos = {
   quem: `Quem Somos
@@ -169,7 +171,15 @@ function renderSite(){
     }
     return true;
   });
-  const destaques = properties.filter(p=> (p.publicarCarrossel || p.destaque) && p.publicarSite!==false).slice(0,5);
+  
+  // Paginação
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  if(currentPage > totalPages) currentPage = totalPages || 1;
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const paginatedItems = filtered.slice(startIdx, endIdx);
+const destaques = properties.filter(p=> (p.publicarCarrossel || p.destaque) && p.publicarSite!==false).slice(0,5);
   const car = destaques[carouselIndex % destaques.length] || properties[0];
 
   app.innerHTML = `
@@ -229,12 +239,30 @@ function renderSite(){
 
   <div class="section-title">Imóveis à venda</div>
   <div class="grid">
-    ${filtered.map(p=>`
+    ${paginatedItems.map(p=>`
       <div class="prop" onclick="openDetail('${p.id}')">
         <div style="position:relative"><img src="${(p.fotos&&p.fotos[0])||''}"><span style="position:absolute;top:8px;left:8px;background:#1a8a3d;color:#fff;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:700">${p.finalidade}</span><span style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.92);color:#146e31;padding:3px 8px;border-radius:999px;font-size:10px">${p.codigo}</span></div>
         <div class="prop-body"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px">${p.titulo}</div><div style="font-size:11px;color:#5a6b52">${p.bairro} • ${p.tipo} • ${p.dorm} dorm</div><div style="font-weight:800;color:#146e31;margin-top:6px">${fmtBRL(p.valor)}</div></div>
       </div>
     `).join('')}
+  </div>
+
+  <!-- Paginação -->
+  <div class="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin:24px 0;flex-wrap:wrap">
+    ${totalPages > 1 ? `
+      <button class="btn" onclick="currentPage=Math.max(1,currentPage-1);renderSite();window.scrollTo(0,0)" ${currentPage===1?'disabled':''} style="padding:8px 14px;font-size:12px">← Anterior</button>
+      ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+        let pageNum;
+        if(totalPages <= 7) pageNum = i+1;
+        else if(currentPage <= 4) pageNum = i+1;
+        else if(currentPage >= totalPages-3) pageNum = totalPages-6+i;
+        else pageNum = currentPage-3+i;
+        return `<button class="btn ${pageNum===currentPage?'btn-dark':''}" onclick="currentPage=${pageNum};renderSite();window.scrollTo(0,0)" style="padding:8px 12px;font-size:12px;min-width:36px">${pageNum}</button>`;
+      }).join('')}
+      ${totalPages > 7 ? `<span style="font-size:12px;color:#888">... ${totalPages} páginas</span>` : ''}
+      <button class="btn" onclick="currentPage=Math.min(totalPages,currentPage+1);renderSite();window.scrollTo(0,0)" ${currentPage===totalPages?'disabled':''} style="padding:8px 14px;font-size:12px">Próxima →</button>
+      <span style="font-size:11px;color:#666;margin-left:12px">Página ${currentPage} de ${totalPages} • ${totalItems} imóveis</span>
+    ` : `<span style="font-size:11px;color:#666"> ${totalItems} imóveis encontrados</span>`}
   </div>
 
   <div class="differentials">
@@ -392,5 +420,5 @@ setInterval(()=>{
 }, 4000);
 renderSite();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a41f579a7b26f1df',t:'MTc5MDU2Mjc5NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
