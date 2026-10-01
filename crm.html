@@ -664,6 +664,7 @@ function render(){
   else if(path==='/imoveis') renderImoveis();
   else if(path==='/proprietarios') renderProps();
   else if(path==='/config') renderConfig();
+  else if(path==='/agenda') renderAgendaFull();
   else if(path==='/leads') renderLeadsFull();
   else if(path==='/financeiro') renderFinanceiro();
   else renderDashboard();
@@ -1011,13 +1012,384 @@ function saveOwner(){
 }
 function delOwner(id){ if(!confirm('Excluir proprietário? Imóveis vinculados ficarão sem proprietário.')) return; owners=owners.filter(o=>o.id!==id); properties.forEach(p=>{ if(p.proprietarioId===id) p.proprietarioId=null; }); saveToStorage(); renderProps(); }
 
-function renderLeadsFull(){
-  document.getElementById('app').innerHTML=`<div class="crm-app"><div class="sidebar"><a href="#/crm/dashboard">📊 Dashboard</a><a href="#/crm/leads" class="active">💬 Leads</a></div><div class="main"><div class="crm-top"><b>Leads</b></div><div class="content"><div class="tbl"><table><thead><tr><th>Nome</th><th>Telefone</th><th>Interesse</th><th>Etapa</th></tr></thead><tbody>${leads.map(l=>`<tr><td>${l.nome}</td><td>${l.telefone}</td><td>${l.interesse}</td><td>${l.etapa}</td></tr>`).join('')}</tbody></table></div></div></div></div><div id="modal" class="modal-bg"><div class="modal"><div class="modal-h"><h3 id="mTitle">Novo</h3><button class="btn" onclick="closeModal()">✕</button></div><div class="modal-b" id="mBody"></div></div></div>`;
+
+
+function renderAgendaFull(){
+  const hoje = new Date().toISOString().split('T')[0];
+  const amanha = new Date(Date.now()+86400000).toISOString().split('T')[0];
+  
+  // Filtros
+  const filtroData = document.getElementById('filtroAgendaData')?.value || '';
+  const filtroTipo = document.getElementById('filtroAgendaTipo')?.value || '';
+  
+  let lista = [...compromissos].sort((a,b)=> (a.data+a.hora).localeCompare(b.data+b.hora));
+  
+  if(filtroData){
+    lista = lista.filter(c=>c.data===filtroData);
+  }
+  if(filtroTipo){
+    lista = lista.filter(c=>c.tipo===filtroTipo);
+  }
+  
+  const hojeCount = compromissos.filter(c=>c.data===hoje).length;
+  const amanhaCount = compromissos.filter(c=>c.data===amanha).length;
+  const semanaCount = compromissos.filter(c=>{
+    const d = new Date(c.data);
+    const now = new Date();
+    const diff = (d - now)/86400000;
+    return diff>=0 && diff<=7;
+  }).length;
+  
+  document.getElementById('app').innerHTML=`
+  <div class="crm-app">
+    <div class="sidebar">
+      <div style="display:flex;gap:10px;align-items:center;padding:4px 0 12px;border-bottom:1px solid rgba(255,255,255,.08)"><span class="bm"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIbGNtcwIQAABtbnRyUkdCIFhZWiAH4gADABQACQAOAB1hY3NwTVNGVAAAAABzYXdzY3RybAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWhhbmSdkQA9QICwPUB0LIGepSKOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAAF9jcHJ0AAABDAAAAAx3dHB0AAABGAAAABRyWFlaAAABLAAAABRnWFlaAAABQAAAABRiWFlaAAABVAAAABRyVFJDAAABaAAAAGBnVFJDAAABaAAAAGBiVFJDAAABaAAAAGBkZXNjAAAAAAAAAAV1UkdCAAAAAAAAAAAAAAAAdGV4dAAAAABDQzAAWFlaIAAAAAAAAPNUAAEAAAABFslYWVogAAAAAAAAb6AAADjyAAADj1hZWiAAAAAAAABilgAAt4kAABjaWFlaIAAAAAAAACSgAAAPhQAAtsRjdXJ2AAAAAAAAACoAAAB8APgBnAJ1A4MEyQZOCBIKGAxiDvQRzxT2GGocLiBDJKwpai5+M+s5sz/WRldNNlR2XBdkHWyGdVZ+jYgskjacq6eMstu+mcrH12Xkd/H5////2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAQABAADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD+/iiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAopu9fX9D/AIUb19f0P+FADqKKiMkcfBb3PfsP88UAS0VgXniPQtND/btX061EWPM8+8XK9Ouep9hnB9K+Pfil/wAFHP2GfgpfXOk/FX9qT4N+BtTtv+Pyz8QeLLcGLtjg9/yx2wMgA+4aK/DD4j/8HGv/AASO+GM8ttf/ALUem+LZU6n4f+HNY8S9PdQmfbgV886t/wAHYH/BH7TR+6+J/wAWdSP/AE5/BTxif1IB/TH5Uf19+wm0t2l6n9KtFfyia/8A8HfH/BMOzmP9g/8AC49atyOt38N9X04j8wc/iDXAT/8AB4f/AME/d+238F/FS5i4OR4b1cn+WPw/yFdd194XXdfef19UV/Jbo3/B39/wTfvJsavpnxb06H1tPAer6kfrwB056AfTpXsukf8AB2X/AMEi7yP/AE3xx8Y9Lm/553fwf8X+vHUGi67r+v8Ah194XT2aZ/TbRX88PhX/AIOhf+CQHiq+trC2+O3izRftAxDeeIfhxrWmaf8Ai+WbHuFyPevu7wb/AMFgf+CZfxAktrfwt+2p8CdSuboHyLGPxev9on14wT+vHfjinZvZXHZvZXP0worznw38T/h1400y21fwn448K65ptz/x6Xmma5pM6n/dXc2334PXGO9dvHeWc4/cXVvN7m4z/LP6enPsAX6KTIPQg/jS0AFFN3r6/of8KdQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFVJZoYP8AXS/n1GcfhQBb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kIyYH8QOM87gcGv3XIONeFeJKaqZPnFLMdnZSSkrpbqajL7lrfTof0xw14i8D8YfvOHuJMBmTsvd54qVtNOVtS0em3lfQ/1sqK/lP8A2DP+Dqv9h39pq50Hwf8AHu31z9nj4haidOsBceIANR8B3upEbTff20AP7CGckh93zZJ6Lt/pt+HfxN+H3xV8N2HjH4ceMPDfjbwvqg/4l+v+F9Tg1PTrzrjDWzYz7Nk+pA5r61aq61Xdar7z7daq61Xdar7z0OiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigApr/AHT/AJ7inV+VP/BS7/grB+y7/wAEyvhvc+KvjF4j/tLxtqVnqX/CFfDTw2f7R8Sa/qIAAGR/yBFyzn5zjPYjDUa9N+nqHzt59vM+8fi18avhd8BvAur/ABD+LXjHRPAvg7RIDc
+"></span><img src="${foto}" alt="${p.codigo}" style="width:100%;height:100%;object-fit:cover"><span class="capa-badge">${p.destaque?'⭐ Destaque':''}</span></div></div>
+      <div class="sec">ORGANIZAÇÃO</div>
+      <a href="#/crm/dashboard" class="${path==='/dashboard'?'active':''}">📊 Dashboard</a>
+      <a href="#/crm/agenda" class="${path==='/agenda'?'active':''}">📅 Agenda (${compromissos.length})</a>
+      <a href="#/crm/leads" class="${path==='/leads'?'active':''}">💬 Leads (${leads.length})</a>
+      <a href="#/crm/financeiro" class="${path==='/financeiro'?'active':''}">💰 Financeiro</a>
+      <div class="sec">CADASTROS</div>
+      <a href="#/crm/imoveis" class="${path==='/imoveis'?'active':''}">🏠 Imóveis (${properties.length})</a>
+      <a href="#/crm/proprietarios" class="${path==='/proprietarios'?'active':''}">👤 Proprietários (${owners.length})</a>
+      <div class="sec">INTEGRAÇÃO</div>
+      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px;margin:4px 0"><div style="font-size:11px;font-weight:700;margin-bottom:6px">🔗 Site + CRM integrado</div><div style="font-size:10px;opacity:.7;margin-bottom:8px">${crmSyncActive? properties.length+' imóveis no site • Sincronizado' : 'Modo offline'}</div><button class="btn" style="width:100%;font-size:11px;background:#fff;color:#0a2210" onclick="forcarSyncSite()">🔄 Forçar sync site</button></div>
+      <div class="sec">SISTEMA</div>
+      <a href="#/crm/config">⚙️ Configurações</a>
+      <a href="index.html" target="_blank">🌐 Ver site público</a>
+    </div>
+    <div class="main">
+      <div class="crm-top">
+        <div>
+          <h2 style="margin:0;font-size:18px">📅 Agenda Completa - Compromissos e Follow-ups</h2>
+          <div style="font-size:11px;color:#666">${compromissos.length} compromissos • ${hojeCount} hoje • ${amanhaCount} amanhã • ${semanaCount} esta semana</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="date" id="filtroAgendaData" value="${filtroData}" onchange="renderAgendaFull()" style="padding:8px 10px;border:1px solid #dfe8d5;border-radius:10px;font-size:12px">
+          <select id="filtroAgendaTipo" onchange="renderAgendaFull()" style="padding:8px 10px;border:1px solid #dfe8d5;border-radius:10px;font-size:12px">
+            <option value="">Todos tipos</option>
+            <option value="Visita" ${filtroTipo==='Visita'?'selected':''}>🏠 Visita</option>
+            <option value="Reunião" ${filtroTipo==='Reunião'?'selected':''}>🤝 Reunião</option>
+            <option value="Ligação" ${filtroTipo==='Ligação'?'selected':''}>📞 Ligação</option>
+            <option value="Follow-up" ${filtroTipo==='Follow-up'?'selected':''}>🔄 Follow-up</option>
+            <option value="Entrega" ${filtroTipo==='Entrega'?'selected':''}>🔑 Entrega chaves</option>
+            <option value="Vistoria" ${filtroTipo==='Vistoria'?'selected':''}>🔍 Vistoria</option>
+          </select>
+          <button class="btn btn-dark" onclick="openCompromissoModal()">+ Novo compromisso</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi"><small>Hoje</small><strong>${hojeCount}</strong><span>${hoje}</span></div>
+          <div class="kpi"><small>Amanhã</small><strong>${amanhaCount}</strong><span>${amanha}</span></div>
+          <div class="kpi"><small>Esta semana</small><strong>${semanaCount}</strong><span>Próx 7 dias</span></div>
+          <div class="kpi"><small>Total</small><strong>${compromissos.length}</strong><span>Compromissos</span></div>
+        </div>
+        
+        <div class="card">
+          <div class="card-body" style="padding:0">
+            <div class="tbl">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Tipo</th>
+                    <th>Título</th>
+                    <th>Cliente</th>
+                    <th>Local/Imóvel</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${lista.map(c=>{
+                    const isHoje = c.data===hoje;
+                    const isAtrasado = c.data < hoje && c.status!=='Concluído';
+                    return `<tr style="${isHoje?'background:#eaf5ec':''} ${isAtrasado?'background:#ffebee':''}">
+                      <td><strong>${fmtDate(c.data)}</strong><br><small>${c.hora}</small></td>
+                      <td><span style="background:#f1f8e9;border:1px solid #c8e6c9;padding:3px 8px;border-radius:999px;font-size:10px">${c.tipo}</span></td>
+                      <td><strong style="font-size:12px">${c.titulo}</strong>${c.descricao? `<br><small style="color:#666">${c.descricao.substring(0,60)}</small>`:''}</td>
+                      <td>${c.cliente||'-'}<br><small style="color:#666">${c.telefone||''}</small></td>
+                      <td>${c.local||'-'}${c.imovelId? `<br><small style="color:#1a8a3d">${properties.find(p=>p.id===c.imovelId)?.codigo||c.imovelId}</small>`:''}</td>
+                      <td><select onchange="atualizarStatusCompromisso('${c.id}', this.value)" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ddd"><option ${c.status==='Pendente'?'selected':''}>Pendente</option><option ${c.status==='Concluído'?'selected':''}>Concluído</option><option ${c.status==='Cancelado'?'selected':''}>Cancelado</option><option ${c.status==='Reagendado'?'selected':''}>Reagendado</option></select></td>
+                      <td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="editarCompromisso('${c.id}')">✎</button><button class="btn btn-sm" onclick="excluirCompromisso('${c.id}')">🗑️</button><button class="btn btn-sm" onclick="duplicarCompromisso('${c.id}')">⧉</button></div></td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+              ${lista.length===0?'<div style="text-align:center;padding:30px;color:#888">Nenhum compromisso encontrado<br><button class="btn btn-dark" style="margin-top:10px" onclick="openCompromissoModal()">+ Novo compromisso</button></div>':''}
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top:16px;background:#eaf5ec;border:1px solid #c8e6c9;border-radius:12px;padding:12px;font-size:11px">
+          <strong>💡 Dicas Agenda:</strong><br>
+          • <strong>Hoje</strong> em verde • <strong>Atrasados</strong> em vermelho • Use filtros por data e tipo<br>
+          • Clique em <strong>Status</strong> para marcar como Concluído<br>
+          • Vincule compromisso a <strong>Imóvel</strong> e <strong>Lead</strong> para follow-up completo<br>
+          • Botão <strong>+ Novo compromisso</strong> para agendar visitas, reuniões, ligações
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal" class="modal-bg"><div class="modal"><div class="modal-h"><h3 id="mTitle">Novo</h3><button class="btn" onclick="closeModal()">✕</button></div><div class="modal-b" id="mBody"></div></div></div>`;
 }
+
+function renderLeadsFull(){
+  const filtroEtapa = document.getElementById('filtroLeadEtapa')?.value || '';
+  const filtroOrigem = document.getElementById('filtroLeadOrigem')?.value || '';
+  const buscaLead = document.getElementById('buscaLead')?.value?.toLowerCase() || '';
+  
+  let lista = [...leads];
+  if(filtroEtapa) lista = lista.filter(l=>l.etapa===filtroEtapa);
+  if(filtroOrigem) lista = lista.filter(l=>l.origem===filtroOrigem);
+  if(buscaLead) lista = lista.filter(l=> l.nome.toLowerCase().includes(buscaLead) || l.telefone.includes(buscaLead) || (l.interesse||'').toLowerCase().includes(buscaLead));
+  
+  const etapas = ['Novo', 'Em atendimento', 'Visita agendada', 'Proposta', 'Fechado', 'Perdido'];
+  const countByEtapa = {};
+  etapas.forEach(e=> countByEtapa[e] = leads.filter(l=>l.etapa===e).length);
+  
+  document.getElementById('app').innerHTML=`
+  <div class="crm-app">
+    <div class="sidebar">
+      <div style="display:flex;gap:10px;align-items:center;padding:4px 0 12px;border-bottom:1px solid rgba(255,255,255,.08)"><span class="bm"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIbGNtcwIQAABtbnRyUkdCIFhZWiAH4gADABQACQAOAB1hY3NwTVNGVAAAAABzYXdzY3RybAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWhhbmSdkQA9QICwPUB0LIGepSKOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAAF9jcHJ0AAABDAAAAAx3dHB0AAABGAAAABRyWFlaAAABLAAAABRnWFlaAAABQAAAABRiWFlaAAABVAAAABRyVFJDAAABaAAAAGBnVFJDAAABaAAAAGBiVFJDAAABaAAAAGBkZXNjAAAAAAAAAAV1UkdCAAAAAAAAAAAAAAAAdGV4dAAAAABDQzAAWFlaIAAAAAAAAPNUAAEAAAABFslYWVogAAAAAAAAb6AAADjyAAADj1hZWiAAAAAAAABilgAAt4kAABjaWFlaIAAAAAAAACSgAAAPhQAAtsRjdXJ2AAAAAAAAACoAAAB8APgBnAJ1A4MEyQZOCBIKGAxiDvQRzxT2GGocLiBDJKwpai5+M+s5sz/WRldNNlR2XBdkHWyGdVZ+jYgskjacq6eMstu+mcrH12Xkd/H5////2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAQABAADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD+/iiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAopu9fX9D/AIUb19f0P+FADqKKiMkcfBb3PfsP88UAS0VgXniPQtND/btX061EWPM8+8XK9Ouep9hnB9K+Pfil/wAFHP2GfgpfXOk/FX9qT4N+BtTtv+Pyz8QeLLcGLtjg9/yx2wMgA+4aK/DD4j/8HGv/AASO+GM8ttf/ALUem+LZU6n4f+HNY8S9PdQmfbgV886t/wAHYH/BH7TR+6+J/wAWdSP/AE5/BTxif1IB/TH5Uf19+wm0t2l6n9KtFfyia/8A8HfH/BMOzmP9g/8AC49atyOt38N9X04j8wc/iDXAT/8AB4f/AME/d+238F/FS5i4OR4b1cn+WPw/yFdd194XXdfef19UV/Jbo3/B39/wTfvJsavpnxb06H1tPAer6kfrwB056AfTpXsukf8AB2X/AMEi7yP/AE3xx8Y9Lm/553fwf8X+vHUGi67r+v8Ah194XT2aZ/TbRX88PhX/AIOhf+CQHiq+trC2+O3izRftAxDeeIfhxrWmaf8Ai+WbHuFyPevu7wb/AMFgf+CZfxAktrfwt+2p8CdSuboHyLGPxev9on14wT+vHfjinZvZXHZvZXP0worznw38T/h1400y21fwn448K65ptz/x6Xmma5pM6n/dXc2334PXGO9dvHeWc4/cXVvN7m4z/LP6enPsAX6KTIPQg/jS0AFFN3r6/of8KdQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFVJZoYP8AXS/n1GcfhQBb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
+"></span><img src="${foto}" alt="${p.codigo}" style="width:100%;height:100%;object-fit:cover"><span class="capa-badge">${p.destaque?'⭐ Destaque':''}</span></div></div>
+      <div class="sec">ORGANIZAÇÃO</div>
+      <a href="#/crm/dashboard" class="${path==='/dashboard'?'active':''}">📊 Dashboard</a>
+      <a href="#/crm/agenda" class="${path==='/agenda'?'active':''}">📅 Agenda (${compromissos.length})</a>
+      <a href="#/crm/leads" class="${path==='/leads'?'active':''}">💬 Leads (${leads.length})</a>
+      <a href="#/crm/financeiro" class="${path==='/financeiro'?'active':''}">💰 Financeiro</a>
+      <div class="sec">CADASTROS</div>
+      <a href="#/crm/imoveis" class="${path==='/imoveis'?'active':''}">🏠 Imóveis (${properties.length})</a>
+      <a href="#/crm/proprietarios" class="${path==='/proprietarios'?'active':''}">👤 Proprietários (${owners.length})</a>
+      <div class="sec">INTEGRAÇÃO</div>
+      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px;margin:4px 0"><div style="font-size:11px;font-weight:700;margin-bottom:6px">🔗 Site + CRM integrado</div><div style="font-size:10px;opacity:.7;margin-bottom:8px">${crmSyncActive? properties.length+' imóveis no site • Sincronizado' : 'Modo offline'}</div><button class="btn" style="width:100%;font-size:11px;background:#fff;color:#0a2210" onclick="forcarSyncSite()">🔄 Forçar sync site</button></div>
+      <div class="sec">SISTEMA</div>
+      <a href="#/crm/config">⚙️ Configurações</a>
+      <a href="index.html" target="_blank">🌐 Ver site público</a>
+    </div>
+    <div class="main">
+      <div class="crm-top">
+        <div>
+          <h2 style="margin:0;font-size:18px">💬 Leads - Gestão e Follow-up</h2>
+          <div style="font-size:11px;color:#666">${leads.length} leads • ${countByEtapa['Novo']} novos • ${countByEtapa['Fechado']} fechados</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="buscaLead" placeholder="🔍 Buscar lead..." value="${buscaLead}" oninput="renderLeadsFull()" style="padding:8px 10px;border:1px solid #dfe8d5;border-radius:10px;font-size:12px;min-width:160px">
+          <select id="filtroLeadEtapa" onchange="renderLeadsFull()" style="padding:8px 10px;border:1px solid #dfe8d5;border-radius:10px;font-size:12px">
+            <option value="">Todas etapas</option>
+            ${etapas.map(e=>`<option value="${e}" ${filtroEtapa===e?'selected':''}>${e} (${countByEtapa[e]})</option>`).join('')}
+          </select>
+          <select id="filtroLeadOrigem" onchange="renderLeadsFull()" style="padding:8px 10px;border:1px solid #dfe8d5;border-radius:10px;font-size:12px">
+            <option value="">Todas origens</option>
+            <option value="Site" ${filtroOrigem==='Site'?'selected':''}>🌐 Site</option>
+            <option value="WhatsApp" ${filtroOrigem==='WhatsApp'?'selected':''}>💬 WhatsApp</option>
+            <option value="Facebook" ${filtroOrigem==='Facebook'?'selected':''}>📘 Facebook</option>
+            <option value="Instagram" ${filtroOrigem==='Instagram'?'selected':''}>📸 Instagram</option>
+            <option value="Indicação" ${filtroOrigem==='Indicação'?'selected':''}>👥 Indicação</option>
+          </select>
+          <button class="btn btn-dark" onclick="openLeadModal()">+ Novo lead</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
+          ${etapas.map(e=>`<div class="kpi" style="cursor:pointer;${filtroEtapa===e?'border-color:#1a8a3d;background:#eaf5ec':''}" onclick="document.getElementById('filtroLeadEtapa').value='${e}';renderLeadsFull()"><small>${e}</small><strong>${countByEtapa[e]}</strong><span>leads</span></div>`).join('')}
+        </div>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px">
+          ${etapas.map(etapa=>{
+            const leadsEtapa = lista.filter(l=>l.etapa===etapa);
+            return `<div class="card" style="min-height:200px"><div class="card-head" style="background:${etapa==='Novo'?'#e3f2fd':etapa==='Fechado'?'#e8f5e9':etapa==='Perdido'?'#ffebee':'#fff'}"><h3 style="font-size:13px">${etapa} (${leadsEtapa.length})</h3></div><div class="card-body" style="padding:8px;display:flex;flex-direction:column;gap:8px;max-height:600px;overflow:auto">
+              ${leadsEtapa.map(l=>{
+                const imovel = properties.find(p=>p.codigo===l.interesse || p.id===l.interesse);
+                return `<div style="border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;cursor:pointer" onclick="editarLead('${l.id}')">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                    <div style="flex:1;min-width:0">
+                      <div style="font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.nome}</div>
+                      <div style="font-size:11px;color:#666">📞 ${l.telefone}</div>
+                      ${l.email? `<div style="font-size:10px;color:#888">${l.email}</div>`:''}
+                    </div>
+                    <span style="font-size:10px;background:#f1f8e9;border:1px solid #c8e6c9;padding:2px 6px;border-radius:999px;white-space:nowrap">${l.origem}</span>
+                  </div>
+                  <div style="margin-top:6px;font-size:11px">
+                    <div>🏠 Interesse: <strong>${imovel? imovel.codigo+' - '+imovel.bairro : l.interesse||'Não informado'}</strong></div>
+                    ${l.valor? `<div>💰 Orçamento: ${fmtBRL(l.valor)}</div>`:''}
+                    <div>📅 ${fmtDate(l.data)} • ${l.ultimoContato? 'Último contato: '+fmtDate(l.ultimoContato) : 'Sem contato'}</div>
+                  </div>
+                  ${l.observacoes? `<div style="margin-top:6px;font-size:10px;background:#f9fbf8;padding:6px;border-radius:6px;color:#666">${l.observacoes.substring(0,80)}</div>`:''}
+                  <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
+                    <button class="btn btn-sm" style="font-size:10px;padding:4px 8px" onclick="event.stopPropagation();mudarEtapaLead('${l.id}', '${etapa}')">→ Próxima etapa</button>
+                    <button class="btn btn-sm" style="font-size:10px;padding:4px 8px" onclick="event.stopPropagation();criarFollowUpLead('${l.id}')">📅 Follow-up</button>
+                    <button class="btn btn-sm" style="font-size:10px;padding:4px 8px" onclick="event.stopPropagation();window.open('https://wa.me/55${l.telefone.replace(/\D/g,'')}?text=Olá ${l.nome}! Sobre seu interesse em ${l.interesse}', '_blank')">💬 WhatsApp</button>
+                  </div>
+                </div>`;
+              }).join('') || '<div style="text-align:center;padding:20px;color:#999;font-size:11px">Nenhum lead nesta etapa</div>'}
+            </div></div>`;
+          }).join('')}
+        </div>
+        
+        <div style="margin-top:16px;background:#e3f2fd;border:1px solid #90caf9;border-radius:12px;padding:12px;font-size:11px">
+          <strong>💡 Funil de Vendas:</strong><br>
+          • <strong>Novo → Em atendimento → Visita agendada → Proposta → Fechado/Perdido</strong><br>
+          • Clique no card do lead para editar • Use <strong>→ Próxima etapa</strong> para mover no funil<br>
+          • <strong>Follow-up</strong> cria compromisso na agenda vinculado ao lead • <strong>WhatsApp</strong> abre conversa direta
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal" class="modal-bg"><div class="modal"><div class="modal-h"><h3 id="mTitle">Novo</h3><button class="btn" onclick="closeModal()">✕</button></div><div class="modal-b" id="mBody"></div></div></div>`;
+}
+
+function openCompromissoModal(id=null){
+  const c = id ? compromissos.find(x=>x.id===id) : null;
+  const modal = document.getElementById('modal');
+  const titleEl = document.getElementById('mTitle');
+  const bodyEl = document.getElementById('mBody');
+  titleEl.textContent = c ? 'Editar compromisso' : 'Novo compromisso - Agenda';
+  bodyEl.innerHTML = `
+    <div class="fgrid">
+      <label>Título*<input id="fCompTitulo" value="${c?.titulo||''}" placeholder="Ex: Visita - Casa Jardim"></label>
+      <label>Tipo*<select id="fCompTipo"><option value="Visita" ${c?.tipo==='Visita'?'selected':''}>🏠 Visita</option><option value="Reunião" ${c?.tipo==='Reunião'?'selected':''}>🤝 Reunião</option><option value="Ligação" ${c?.tipo==='Ligação'?'selected':''}>📞 Ligação</option><option value="Follow-up" ${c?.tipo==='Follow-up'?'selected':''}>🔄 Follow-up</option><option value="Entrega" ${c?.tipo==='Entrega'?'selected':''}>🔑 Entrega chaves</option><option value="Vistoria" ${c?.tipo==='Vistoria'?'selected':''}>🔍 Vistoria</option></select></label>
+      <label>Data*<input type="date" id="fCompData" value="${c?.data||new Date().toISOString().split('T')[0]}"></label>
+      <label>Hora*<input type="time" id="fCompHora" value="${c?.hora||'09:00'}"></label>
+      <label>Cliente<input id="fCompCliente" value="${c?.cliente||''}" placeholder="Nome do cliente" list="clientesList"><datalist id="clientesList">${leads.map(l=>`<option value="${l.nome}">`).join('')}${owners.map(o=>`<option value="${o.nome}">`).join('')}</datalist></label>
+      <label>Telefone<input id="fCompTelefone" value="${c?.telefone||''}" placeholder="19 99111-2222"></label>
+      <label>Local/Endereço<input id="fCompLocal" value="${c?.local||''}" placeholder="Rua, bairro ou escritório"></label>
+      <label>Imóvel vinculado<select id="fCompImovel"><option value="">Nenhum</option>${properties.map(p=>`<option value="${p.id}" ${c?.imovelId===p.id?'selected':''}>${p.codigo} - ${p.bairro} - ${p.titulo.substring(0,30)}</option>`).join('')}</select></label>
+      <label>Lead vinculado<select id="fCompLead"><option value="">Nenhum</option>${leads.map(l=>`<option value="${l.id}" ${c?.leadId===l.id?'selected':''}>${l.nome} - ${l.telefone} - ${l.interesse}</option>`).join('')}</select></label>
+      <label>Status<select id="fCompStatus"><option value="Pendente" ${c?.status==='Pendente'?'selected':''}>Pendente</option><option value="Concluído" ${c?.status==='Concluído'?'selected':''}>Concluído</option><option value="Cancelado" ${c?.status==='Cancelado'?'selected':''}>Cancelado</option><option value="Reagendado" ${c?.status==='Reagendado'?'selected':''}>Reagendado</option></select></label>
+      <label class="full">Descrição/Observações<textarea id="fCompDesc" placeholder="Detalhes do compromisso...">${c?.descricao||''}</textarea></label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-dark" style="flex:1" onclick="salvarCompromisso('${c?.id||''}')">💾 Salvar compromisso</button>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+    </div>
+  `;
+  modal.classList.add('open');
+}
+
+function salvarCompromisso(id){
+  const get = id=>document.getElementById(id)?.value||'';
+  const novo = {
+    id: id || 'C-'+Date.now(),
+    titulo: get('fCompTitulo'),
+    tipo: get('fCompTipo'),
+    data: get('fCompData'),
+    hora: get('fCompHora'),
+    cliente: get('fCompCliente'),
+    telefone: get('fCompTelefone'),
+    local: get('fCompLocal'),
+    imovelId: get('fCompImovel'),
+    leadId: get('fCompLead'),
+    status: get('fCompStatus'),
+    descricao: get('fCompDesc')
+  };
+  if(!novo.titulo || !novo.data || !novo.hora){ alert('Preencha título, data e hora!'); return; }
+  const idx = compromissos.findIndex(c=>c.id===novo.id);
+  if(idx>=0) compromissos[idx]=novo; else compromissos.push(novo);
+  saveToStorage();
+  closeModal();
+  if(location.hash.includes('agenda')) renderAgendaFull(); else renderDashboard();
+  alert('✅ Compromisso salvo!');
+}
+
+function editarCompromisso(id){ openCompromissoModal(id); }
+function excluirCompromisso(id){ if(!confirm('Excluir compromisso?')) return; compromissos=compromissos.filter(c=>c.id!==id); saveToStorage(); renderAgendaFull(); }
+function duplicarCompromisso(id){ const c=compromissos.find(x=>x.id===id); if(!c) return; const novo={...c, id:'C-'+Date.now(), titulo:c.titulo+' (CÓPIA)'}; compromissos.push(novo); saveToStorage(); renderAgendaFull(); }
+function atualizarStatusCompromisso(id, status){ const c=compromissos.find(x=>x.id===id); if(c){ c.status=status; saveToStorage(); renderAgendaFull(); } }
+
+function openLeadModal(id=null){
+  const l = id ? leads.find(x=>x.id===id) : null;
+  const modal = document.getElementById('modal');
+  const titleEl = document.getElementById('mTitle');
+  const bodyEl = document.getElementById('mBody');
+  titleEl.textContent = l ? 'Editar lead - '+l.nome : 'Novo lead';
+  bodyEl.innerHTML = `
+    <div class="fgrid">
+      <label>Nome*<input id="fLeadNome" value="${l?.nome||''}" placeholder="Nome completo"></label>
+      <label>Telefone*<input id="fLeadTelefone" value="${l?.telefone||''}" placeholder="19 99111-2222"></label>
+      <label>Email<input id="fLeadEmail" value="${l?.email||''}" placeholder="email@exemplo.com"></label>
+      <label>Interesse (código imóvel)<select id="fLeadInteresse"><option value="">Selecione</option>${properties.map(p=>`<option value="${p.codigo}" ${l?.interesse===p.codigo?'selected':''}>${p.codigo} - ${p.bairro} - ${fmtBRL(p.valor)}</option>`).join('')}<option value="Geral">Interesse geral</option></select></label>
+      <label>Etapa*<select id="fLeadEtapa"><option value="Novo" ${l?.etapa==='Novo'?'selected':''}>Novo</option><option value="Em atendimento" ${l?.etapa==='Em atendimento'?'selected':''}>Em atendimento</option><option value="Visita agendada" ${l?.etapa==='Visita agendada'?'selected':''}>Visita agendada</option><option value="Proposta" ${l?.etapa==='Proposta'?'selected':''}>Proposta</option><option value="Fechado" ${l?.etapa==='Fechado'?'selected':''}>Fechado ✅</option><option value="Perdido" ${l?.etapa==='Perdido'?'selected':''}>Perdido ❌</option></select></label>
+      <label>Origem<select id="fLeadOrigem"><option value="Site" ${l?.origem==='Site'?'selected':''}>🌐 Site</option><option value="WhatsApp" ${l?.origem==='WhatsApp'?'selected':''}>💬 WhatsApp</option><option value="Facebook" ${l?.origem==='Facebook'?'selected':''}>📘 Facebook</option><option value="Instagram" ${l?.origem==='Instagram'?'selected':''}>📸 Instagram</option><option value="Indicação" ${l?.origem==='Indicação'?'selected':''}>👥 Indicação</option><option value="Telefone" ${l?.origem==='Telefone'?'selected':''}>📞 Telefone</option></select></label>
+      <label>Orçamento R$<input type="number" id="fLeadValor" value="${l?.valor||''}" placeholder="500000"></label>
+      <label>Data<input type="date" id="fLeadData" value="${l?.data||new Date().toISOString().split('T')[0]}"></label>
+      <label>Último contato<input type="date" id="fLeadUltimoContato" value="${l?.ultimoContato||''}"></label>
+      <label class="full">Observações<textarea id="fLeadObs" placeholder="Anotações sobre o lead, preferências, etc...">${l?.observacoes||''}</textarea></label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-dark" style="flex:1" onclick="salvarLead('${l?.id||''}')">💾 Salvar lead</button>
+      ${l? `<button class="btn" onclick="criarFollowUpLead('${l.id}')">📅 Criar follow-up</button>` : ''}
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+    </div>
+  `;
+  modal.classList.add('open');
+}
+
+function salvarLead(id){
+  const get = id=>document.getElementById(id)?.value||'';
+  const novo = {
+    id: id || 'L-'+Date.now(),
+    nome: get('fLeadNome'),
+    telefone: get('fLeadTelefone'),
+    email: get('fLeadEmail'),
+    interesse: get('fLeadInteresse'),
+    etapa: get('fLeadEtapa'),
+    origem: get('fLeadOrigem'),
+    valor: Number(get('fLeadValor')||0),
+    data: get('fLeadData'),
+    ultimoContato: get('fLeadUltimoContato') || new Date().toISOString().split('T')[0],
+    observacoes: get('fLeadObs')
+  };
+  if(!novo.nome || !novo.telefone){ alert('Preencha nome e telefone!'); return; }
+  const idx = leads.findIndex(l=>l.id===novo.id);
+  if(idx>=0) leads[idx]=novo; else leads.unshift(novo);
+  saveToStorage();
+  closeModal();
+  renderLeadsFull();
+  alert('✅ Lead salvo!');
+}
+
+function editarLead(id){ openLeadModal(id); }
+function excluirLead(id){ if(!confirm('Excluir lead?')) return; leads=leads.filter(l=>l.id!==id); saveToStorage(); renderLeadsFull(); }
+function mudarEtapaLead(id, etapaAtual){
+  const etapas = ['Novo', 'Em atendimento', 'Visita agendada', 'Proposta', 'Fechado', 'Perdido'];
+  const idx = etapas.indexOf(etapaAtual);
+  const proxima = etapas[Math.min(idx+1, etapas.length-1)];
+  const l = leads.find(x=>x.id===id);
+  if(l){ l.etapa=proxima; l.ultimoContato=new Date().toISOString().split('T')[0]; saveToStorage(); renderLeadsFull(); }
+}
+function criarFollowUpLead(leadId){
+  const l = leads.find(x=>x.id===leadId);
+  if(!l) return;
+  const amanha = new Date(Date.now()+86400000).toISOString().split('T')[0];
+  const novoComp = {
+    id: 'C-'+Date.now(),
+    titulo: `Follow-up - ${l.nome}`,
+    tipo: 'Follow-up',
+    data: amanha,
+    hora: '09:00',
+    cliente: l.nome,
+    telefone: l.telefone,
+    local: 'Ligação/WhatsApp',
+    leadId: l.id,
+    imovelId: properties.find(p=>p.codigo===l.interesse)?.id || '',
+    status: 'Pendente',
+    descricao: `Follow-up do lead ${l.nome} - Interesse: ${l.interesse} - ${l.observacoes||''}`
+  };
+  compromissos.push(novoComp);
+  saveToStorage();
+  alert(`✅ Follow-up criado para amanhã (${amanha} 09:00) para ${l.nome}!\n\nVá em Agenda para ver.`);
+  location.hash='#/crm/agenda';
+  renderAgendaFull();
+}
+
+
 function renderFinanceiro(){
   document.getElementById('app').innerHTML=`<div class="crm-app"><div class="sidebar"><a href="#/crm/dashboard">📊 Dashboard</a><a href="#/crm/financeiro" class="active">💰 Financeiro</a></div><div class="main"><div class="crm-top"><b>Financeiro</b></div><div class="content"><div class="finance-grid"><div class="finance-card receita"><small>Receitas</small><strong>${fmtBRL(financeiro.receitas.reduce((s,r)=>s+r.valor,0))}</strong></div><div class="finance-card despesa"><small>Despesas</small><strong>${fmtBRL(financeiro.despesas.reduce((s,d)=>s+d.valor,0))}</strong></div></div></div></div></div><div id="modal" class="modal-bg"><div class="modal"><div class="modal-h"><h3 id="mTitle">Novo</h3><button class="btn" onclick="closeModal()">✕</button></div><div class="modal-b" id="mBody"></div></div></div>`;
 }
-function openCompromissoModal(){ alert('Vá para Dashboard para agenda'); location.hash='#/crm/dashboard'; }
+
 
 
 function abrirSite(){
