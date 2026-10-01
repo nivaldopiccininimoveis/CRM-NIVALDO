@@ -27,7 +27,7 @@
 .greeting{background:linear-gradient(135deg,#1a8a3d 0%, #0a2210 100%);color:#fff;border-radius:20px;padding:22px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 24px rgba(26,138,61,.25)}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 @media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}}
-.kpi{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:4px}.kpi small{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px}.kpi strong{font-size:22px;font-weight:800;line-height:1}.kpi span{font-size:11px;color:#888}
 .dashboard-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-bottom:18px}
 @media(max-width:1000px){.dashboard-grid{grid-template-columns:1fr}}
 .finance-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -36,8 +36,8 @@
 .finance-card.receita{background:linear-gradient(135deg,#e8f5e9 0%, #c8e6c9 100%);border-color:#a5d6a7}
 .finance-card.despesa{background:linear-gradient(135deg,#ffebee 0%, #ffcdd2 100%);border-color:#ef9a9a}
 .finance-card.saldo{background:linear-gradient(135deg,#1a8a3d 0%, #0a2210 100%);color:#fff;border-color:#0a2210}
-.agenda-item{display:flex;gap:12px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff}
-.agenda-time{width:56px;text-align:center;flex-shrink:0}
+.agenda-item{display:flex;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff;align-items:flex-start}.agenda-item div{overflow:hidden;word-break:break-word}
+.agenda-time{width:64px;text-align:center;flex-shrink:0;display:flex;flex-direction:column;gap:2px}.agenda-time strong{font-size:13px;font-weight:700;display:block}.agenda-time small{font-size:10px;color:#666;display:block}
 .lead-stage{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
 .stage-novo{background:#e3f2fd;color:#1565c0}.stage-atendimento{background:#fff3e0;color:#ef6c00}.stage-visita{background:#e8f5e9;color:#2e7d32}.stage-proposta{background:#f3e5f5;color:#7b1fa2}.stage-fechado{background:#e0f2f1;color:#00695c}
 /* IMOVEIS GRID */
@@ -704,7 +704,7 @@ function renderDashboard(){
           <div class="kpi"><small>Total imóveis</small><strong>${properties.length}</strong><span>VGV ${fmtBRL(properties.reduce((s,p)=>s+p.valor,0))}</span></div>
         </div>
         <div class="dashboard-grid">
-          <div class="card"><div class="card-head"><h3>📅 Agenda hoje</h3><button class="btn btn-dark" onclick="openCompromissoModal()">+ Novo</button></div><div class="card-body">${agendaHoje.map(c=>`<div class="agenda-item"><div class="agenda-time"><strong>${c.hora}</strong><small>${fmtDate(c.data)}</small></div><div style="flex:1"><div style="font-weight:600;font-size:13px">${c.titulo}</div><div style="font-size:11px;color:#666">👤 ${c.cliente} • 📍 ${c.local}</div></div></div>`).join('') || '<div style="text-align:center;padding:20px;color:#888">Nenhum compromisso hoje</div>'}</div></div>
+          <div class="card"><div class="card-head"><h3>📅 Agenda hoje</h3><button class="btn btn-dark" onclick="openCompromissoModal()">+ Novo</button></div><div class="card-body">${agendaHoje.map(c=>`<div class="agenda-item"><div class="agenda-time"><strong>${c.hora}</strong><small>${fmtDate(c.data)}</small></div><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.titulo}</div><div style="font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${c.cliente} • 📍 ${c.local}</div></div></div>`).join('') || '<div style="text-align:center;padding:20px;color:#888">Nenhum compromisso hoje</div>'}</div></div>
           <div class="card"><div class="card-head"><h3>💬 Leads</h3><button class="btn btn-dark" onclick="location.hash='#/crm/leads'">Ver todos</button></div><div class="card-body">${leads.slice(0,3).map(l=>`<div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px"><div style="display:flex;justify-content:space-between"><b style="font-size:12px">${l.nome}</b><span class="lead-stage stage-novo">${l.etapa}</span></div><div style="font-size:11px;color:#666">${l.telefone} • ${l.interesse}</div></div>`).join('')}</div></div>
         </div>
         <div class="card"><div class="card-head"><h3>💰 Financeiro resumo</h3><button class="btn btn-dark" onclick="location.hash='#/crm/financeiro'">Ver completo</button></div><div class="card-body"><div class="finance-grid"><div class="finance-card receita"><small>Receitas</small><strong>${fmtBRL(totalReceitas)}</strong></div><div class="finance-card despesa"><small>Despesas</small><strong>${fmtBRL(financeiro.despesas.filter(d=>d.status==='Pago').reduce((s,d)=>s+d.valor,0))}</strong></div><div class="finance-card saldo"><small>Saldo</small><strong>${fmtBRL(saldo)}</strong></div></div></div></div>
