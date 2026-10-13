@@ -475,10 +475,74 @@ function enviarWhats(codigo, titulo){
   const msg=document.getElementById('leadMsg')?.value||'';
   if(!nome){ alert('Por favor, informe seu nome'); return; }
   if(!tel){ alert('Por favor, informe seu WhatsApp'); return; }
-  const texto=`Olá ${config.nome}! Meu nome é ${nome} (WhatsApp: ${tel}). Tenho interesse no imóvel ${codigo} - ${titulo}. ${msg} Vim pelo site.`;
+  
+  // Salva lead no CRM automaticamente
+  try{
+    const novoLead = {
+      id: 'L-'+Date.now(),
+      nome: nome,
+      telefone: tel,
+      email: '',
+      interesse: codigo,
+      etapa: 'Novo',
+      origem: 'Site',
+      valor: 0,
+      data: new Date().toISOString().split('T')[0],
+      ultimoContato: new Date().toISOString().split('T')[0],
+      observacoes: `Interesse no imóvel ${codigo} - ${titulo}. Mensagem: ${msg}. Enviado pelo site em ${new Date().toLocaleString('pt-BR')}`
+    };
+    // Salva no localStorage do CRM
+    const STORAGE_LEADS='nivaldo_crm_leads_v2';
+    let leadsSalvos = [];
+    try{
+      const saved = localStorage.getItem(STORAGE_LEADS);
+      if(saved) leadsSalvos = JSON.parse(saved);
+    }catch(e){}
+    leadsSalvos.unshift(novoLead);
+    localStorage.setItem(STORAGE_LEADS, JSON.stringify(leadsSalvos));
+    localStorage.setItem('nivaldo_sync_timestamp', Date.now().toString());
+    console.log('Lead salvo no CRM:', novoLead);
+  }catch(e){ console.warn('Erro ao salvar lead no CRM', e); }
+  
+  const texto=`Olá ${config.nome}! Meu nome é ${nome} (WhatsApp: ${tel}). Tenho interesse no imóvel ${codigo} - ${titulo}. ${msg} Vim pelo site ${location.origin}.`;
   const url=`https://wa.me/${config.telRaw}?text=${encodeURIComponent(texto)}`;
-  window.open(url,'_blank');
+  // Abre direto no WhatsApp (mesma aba, não nova página) - cai direto no seu WhatsApp
+  window.location.href = url;
+  // Fecha modal após 1s
+  setTimeout(()=>{ fecharDetalhe(); }, 1000);
 }
+
+function enviarContatoGeral(){
+  const nome=document.getElementById('contatoNome')?.value||'';
+  const tel=document.getElementById('contatoTel')?.value||'';
+  const msg=document.getElementById('contatoMsg')?.value||'';
+  if(!nome || !tel){ alert('Informe nome e WhatsApp'); return; }
+  try{
+    const novoLead = {
+      id: 'L-'+Date.now(),
+      nome: nome,
+      telefone: tel,
+      email: document.getElementById('contatoEmail')?.value||'',
+      interesse: 'Contato geral site',
+      etapa: 'Novo',
+      origem: 'Site',
+      valor: 0,
+      data: new Date().toISOString().split('T')[0],
+      ultimoContato: new Date().toISOString().split('T')[0],
+      observacoes: `Contato geral site. Mensagem: ${msg}`
+    };
+    const STORAGE_LEADS='nivaldo_crm_leads_v2';
+    let leadsSalvos = [];
+    try{ const saved = localStorage.getItem(STORAGE_LEADS); if(saved) leadsSalvos = JSON.parse(saved); }catch(e){}
+    leadsSalvos.unshift(novoLead);
+    localStorage.setItem(STORAGE_LEADS, JSON.stringify(leadsSalvos));
+    localStorage.setItem('nivaldo_sync_timestamp', Date.now().toString());
+  }catch(e){}
+  const texto=`Olá ${config.nome}! Meu nome é ${nome} (WhatsApp: ${tel}). ${msg} Vim pelo site.`;
+  const url=`https://wa.me/${config.telRaw}?text=${encodeURIComponent(texto)}`;
+  window.location.href = url;
+}
+
 
 
 setInterval(()=>{
